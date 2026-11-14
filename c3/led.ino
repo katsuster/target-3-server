@@ -3,7 +3,8 @@
 #include "ble.h"
 #include "main.h"
 
-static unsigned long errorEnd = 0;
+static bool errorShown = false;
+static unsigned long errorStart = 0;
 static int lastR = -1, lastG = -1, lastB = -1;
 
 static void writeLED(uint8_t r, uint8_t g, uint8_t b) {
@@ -27,11 +28,17 @@ void initLED(void) {
 
 //Red for a while (servo was powered off by the timeout)
 void showLEDError(void) {
-  errorEnd = millis() + LED_ERROR_MS;
+  errorShown = true;
+  errorStart = millis();
 }
 
 void loopLED(void) {
-  if ((long)(errorEnd - millis()) > 0) {
+  //Compare elapsed time, safe for millis() overflow (about 49.7 days)
+  if (errorShown && millis() - errorStart >= LED_ERROR_MS) {
+    errorShown = false;
+  }
+
+  if (errorShown) {
     writeLED(LED_LEVEL, 0, 0);
   } else if (isServoBusy()) {
     writeLED(0, LED_LEVEL, 0);
