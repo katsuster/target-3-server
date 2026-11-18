@@ -1,4 +1,3 @@
-
 # GPIO
 
 This document describes GPIO and their purpose.
@@ -8,34 +7,33 @@ This document describes GPIO and their purpose.
 
 ![M5Stamp C3 pinmap](m5_stamp_c3_09.png)
 
-Please refer M5STACK official documents to refer the original and newest version of image.
+Please refer to M5Stack official documents for the original and latest version of the image.
 
 URL: https://docs.m5stack.com/en/core/stamp_c3
 
 GPIO purpose of M5Stamp C3.
 
-| GPIO | Controller node | direction |
-|--|--|--|
-| G0  | ---          | ---    |
-| G1  | ---          | ---    |
-| G4  | ---          | ---    |
-| G5  | SERVO_PWR_EN | Output |
-| G6  | SERVO        | Output |
-| G7  | ---          | ---    |
-| G8  | ---          | ---    |
-| G9  | ---          | ---    |
-| G10 | ---          | ---    |
-| G18 | ---          | ---    |
-| G19 | ---          | ---    |
-| G20 | ---          | ---    |
-| G21 | ---          | ---    |
-
-Note that polarity of SWITCH_BUTTON is low-active, other input ports are high-active.
+| GPIO | Signal | Direction | Note |
+|--|--|--|--|
+| G0  | ---          | ---    | |
+| G1  | ---          | ---    | |
+| G2  | RGB LED      | Output | |
+| G4  | ---          | ---    | |
+| G5  | SERVO_PWR_EN | Output | 10k Ohm pull-down |
+| G6  | SERVO        | Output | |
+| G7  | ---          | ---    | |
+| G8  | ---          | ---    | |
+| G9  | ---          | ---    | |
+| G10 | ---          | ---    | |
+| G18 | USB D-       | In/Out | Default function, not used by this firmware |
+| G19 | USB D+       | In/Out | Default function, not used by this firmware |
+| G20 | UART Rx      | Input  | |
+| G21 | UART Tx      | Output | |
 
 | Output signal | Low | High | Note |
 |--|--|--|--|
 | SERVO_PWR_EN | Power off | Power on | --- |
-| SERVO        | Motor off | Rotate   | PWM (pulse length: 0.5~2.5ms) |
+| SERVO        | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
 
 GPIO pullup/pulldown voltage of M5Stamp C3.
 
