@@ -6,7 +6,7 @@
 //GPIO
 #define GPIO_LED                  2
 #define GPIO_SERVO                6
-#define GPIO_SERVO_PWR_EN         19
+#define GPIO_SERVO_PWR_EN         5
 
 //Command
 #define CMD_LEN                   64
