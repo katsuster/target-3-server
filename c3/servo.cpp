@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
-#include "main.h"
+#include "led.h"
+#include "servo.h"
 
 #define SV_IDLE                   0
 #define SV_POWER_ON               1
