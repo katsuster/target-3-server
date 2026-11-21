@@ -34,6 +34,19 @@ Same as target-6-server.
   * For M5Stamp C3
 
 
+## LED
+
+The RGB LED of M5Stamp C3 shows the state of the server.
+If several states are active at the same time, the upper one in the table is shown.
+
+| Color | Pattern | State |
+|--|--|--|
+| Red   | On for 3 seconds     | Error: the servo was powered off forcibly |
+| Green | On                   | The servo is moving |
+| Blue  | On                   | Connected via BLE |
+| Blue  | Blink (250ms on/off) | Not connected, advertising |
+
+
 ## Other documents
 
 * [GPIO](doc/gpio.md)
