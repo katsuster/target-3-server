@@ -25,8 +25,8 @@ GPIO purpose of M5Stamp C3.
 | G8  | ---          | ---    | |
 | G9  | ---          | ---    | |
 | G10 | ---          | ---    | |
-| G18 | USB D-       | In/Out | Default function, not used by this firmware |
-| G19 | USB D+       | In/Out | Default function, not used by this firmware |
+| G18 | ---          | ---    | |
+| G19 | ---          | ---    | |
 | G20 | UART Rx      | Input  | |
 | G21 | UART Tx      | Output | |
 
