@@ -1,7 +1,8 @@
 #include <Arduino.h>
 
 #include "ble.h"
-#include "main.h"
+#include "led.h"
+#include "servo.h"
 
 static bool errorShown = false;
 static unsigned long errorStart = 0;
