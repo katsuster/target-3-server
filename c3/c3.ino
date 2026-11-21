@@ -3,7 +3,9 @@
 
 #include "ble.h"
 #include "cmd.h"
+#include "led.h"
 #include "main.h"
+#include "servo.h"
 
 void setup(void) {
   //Turn off the servo before anything else
