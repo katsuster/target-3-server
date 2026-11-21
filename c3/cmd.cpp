@@ -3,6 +3,7 @@
 #include "ble.h"
 #include "cmd.h"
 #include "main.h"
+#include "servo.h"
 
 static int device_id = -1;
 
@@ -37,8 +38,7 @@ void setDeviceID(int id) {
   device_id = id;
 }
 
-void onReceive(String &str) {
-  const char *cmd = str.c_str();
+void onReceive(const char *cmd) {
   char name[16] = "";
   int a = 0, b = 0, n;
   char extra;

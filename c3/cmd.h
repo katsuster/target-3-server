@@ -1,8 +1,9 @@
 #ifndef C3_CMD_H__
 #define C3_CMD_H__
 
-#define VERSION             "0.1.0"
+#define CMD_LEN                   64
 
+//Command
 #define CMD_HELP            "help"
 #define CMD_INIT            "init"
 #define CMD_RAISE           "raise"
@@ -14,6 +15,6 @@
 void initCmd(void);
 int getDeviceID(void);
 void setDeviceID(int id);
-void onReceive(String &str);
+void onReceive(const char *cmd);
 
 #endif /* C3_CMD_H__ */
