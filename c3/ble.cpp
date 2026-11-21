@@ -89,6 +89,7 @@ void loopBLE(void) {
 
     // disconnecting
     if (!deviceConnected && oldDeviceConnected) {
+        lockCmd();
         disconnectTime = millis();
         oldDeviceConnected = deviceConnected;
     }

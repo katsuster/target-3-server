@@ -7,6 +7,11 @@
 
 static int device_id = -1;
 
+static bool unlocked = false;
+static unsigned long unlockTime = 0;
+static unsigned long unlockFailTime = 0;
+static bool unlockFailed = false;
+
 static void sendResult(const char *cmd, bool ok) {
   char buf[CMD_LEN];
 
@@ -23,11 +28,45 @@ static void cmdHelp(void) {
   txBLE("servotime ms     : Set wait time at up and rest (100-700).\n");
   txBLE("servoget         : Show the servo settings.\n");
   txBLE("servomove deg    : Move to the angle and power off (for adjustment).\n");
+  txBLE("unlock key       : Allow servo, servotime and servomove for a while.\n");
+  txBLE("lock             : Disallow servo, servotime and servomove.\n");
   txBLE("  ver." VERSION "\n");
+}
+
+//Compare elapsed time, safe for millis() overflow (about 49.7 days)
+static bool isUnlocked(void) {
+  if (unlocked && millis() - unlockTime >= UNLOCK_MS) {
+    unlocked = false;
+  }
+
+  return unlocked;
+}
+
+static bool unlockCmd(const char *key) {
+  if (unlockFailed && millis() - unlockFailTime < UNLOCK_FAIL_WAIT_MS) {
+    return false;
+  }
+
+  if (strcmp(key, UNLOCK_KEY) != 0) {
+    unlockFailed = true;
+    unlockFailTime = millis();
+    return false;
+  }
+
+  unlocked = true;
+  unlockTime = millis();
+  unlockFailed = false;
+
+  return true;
 }
 
 void initCmd(void) {
   device_id = -1;
+  lockCmd();
+}
+
+void lockCmd(void) {
+  unlocked = false;
 }
 
 int getDeviceID(void) {
@@ -64,13 +103,21 @@ void onReceive(const char *cmd) {
     sendResult(name, startServo());
   } else if (strcmp(name, CMD_SERVO) == 0) {
     n = sscanf(cmd, CMD_SERVO " %d %d %c", &a, &b, &extra);
-    sendResult(name, n == 2 && !isServoBusy() && setServoAngle(a, b));
+    sendResult(name, n == 2 && isUnlocked() && !isServoBusy() && setServoAngle(a, b));
   } else if (strcmp(name, CMD_SERVO_TIME) == 0) {
     n = sscanf(cmd, CMD_SERVO_TIME " %d %c", &a, &extra);
-    sendResult(name, n == 1 && !isServoBusy() && setServoTime(a));
+    sendResult(name, n == 1 && isUnlocked() && !isServoBusy() && setServoTime(a));
   } else if (strcmp(name, CMD_SERVO_MOVE) == 0) {
     n = sscanf(cmd, CMD_SERVO_MOVE " %d %c", &a, &extra);
-    sendResult(name, n == 1 && moveServo(a));
+    sendResult(name, n == 1 && isUnlocked() && moveServo(a));
+  } else if (strcmp(name, CMD_UNLOCK) == 0) {
+    char key[UNLOCK_KEY_LEN];
+
+    n = sscanf(cmd, CMD_UNLOCK " %31s %c", key, &extra);
+    sendResult(name, n == 1 && unlockCmd(key));
+  } else if (strcmp(name, CMD_LOCK) == 0) {
+    lockCmd();
+    sendResult(name, true);
   } else if (strcmp(name, CMD_SERVO_GET) == 0) {
     char buf[CMD_LEN];
 
