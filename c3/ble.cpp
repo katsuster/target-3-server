@@ -84,8 +84,7 @@ void loopBLE(void) {
 
     // receiving
     while (xQueueReceive(rxQueue, &c, 0) == pdTRUE) {
-        String cmd = String(c.buf);
-        onReceive(cmd);
+        onReceive(c.buf);
     }
 
     // disconnecting
