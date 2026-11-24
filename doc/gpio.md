@@ -18,13 +18,13 @@ GPIO purpose of M5Stamp C3.
 | G0  | ---          | ---    | |
 | G1  | ---          | ---    | |
 | G2  | RGB LED      | Output | |
-| G4  | ---          | ---    | |
-| G5  | SERVO_PWR_EN | Output | 10k Ohm pull-down |
-| G6  | SERVO        | Output | |
-| G7  | ---          | ---    | |
+| G4  | PWR_EN       | Output | 10k Ohm pull-down |
+| G5  | M1_PWM1      | Output | |
+| G6  | M1_PWM2      | Output | |
+| G7  | M2_PWM1      | Output | |
 | G8  | ---          | ---    | |
 | G9  | ---          | ---    | |
-| G10 | ---          | ---    | |
+| G10 | M2_PWM2      | Output | |
 | G18 | ---          | ---    | |
 | G19 | ---          | ---    | |
 | G20 | UART Rx      | Input  | |
@@ -32,8 +32,11 @@ GPIO purpose of M5Stamp C3.
 
 | Output signal | Low | High | Note |
 |--|--|--|--|
-| SERVO_PWR_EN | Power off | Power on | --- |
-| SERVO        | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
+| PWR_EN   | Power off | Power on | --- |
+| M1_PWM1  | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
+| M1_PWM2  | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
+| M2_PWM1  | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
+| M2_PWM2  | ---       | ---      | 50Hz PWM (pulse length: 0.5~2.5ms) |
 
 GPIO pullup/pulldown voltage of M5Stamp C3.
 
