@@ -24,10 +24,10 @@ static void cmdHelp(void) {
   txBLE("help             : Show this message.\n");
   txBLE("init devid       : Set device ID.\n");
   txBLE("raise            : Raise the targets.\n");
-  txBLE("servo rest up    : Set angles of rest and up (0-180).\n");
+  txBLE("servo ch rest up : Set angles of rest and up (ch: 1-4, 0-180).\n");
   txBLE("servotime ms     : Set wait time at up and rest (100-700).\n");
-  txBLE("servoget         : Show the servo settings.\n");
-  txBLE("servomove deg    : Move to the angle and power off (for adjustment).\n");
+  txBLE("servoget ch      : Show the servo settings (ch: 1-4).\n");
+  txBLE("servomove ch deg : Move to the angle and power off (for adjustment).\n");
   txBLE("unlock key       : Allow servo, servotime and servomove for a while.\n");
   txBLE("lock             : Disallow servo, servotime and servomove.\n");
   txBLE("  ver." VERSION "\n");
@@ -79,7 +79,7 @@ void setDeviceID(int id) {
 
 void onReceive(const char *cmd) {
   char name[16] = "";
-  int a = 0, b = 0, n;
+  int a = 0, b = 0, c = 0, n;
   char extra;
 
   n = sscanf(cmd, "%15s", name);
@@ -102,14 +102,14 @@ void onReceive(const char *cmd) {
   } else if (strcmp(name, CMD_RAISE) == 0) {
     sendResult(name, startServo());
   } else if (strcmp(name, CMD_SERVO) == 0) {
-    n = sscanf(cmd, CMD_SERVO " %d %d %c", &a, &b, &extra);
-    sendResult(name, n == 2 && isUnlocked() && !isServoBusy() && setServoAngle(a, b));
+    n = sscanf(cmd, CMD_SERVO " %d %d %d %c", &a, &b, &c, &extra);
+    sendResult(name, n == 3 && isUnlocked() && !isServoBusy() && setServoAngle(a, b, c));
   } else if (strcmp(name, CMD_SERVO_TIME) == 0) {
     n = sscanf(cmd, CMD_SERVO_TIME " %d %c", &a, &extra);
     sendResult(name, n == 1 && isUnlocked() && !isServoBusy() && setServoTime(a));
   } else if (strcmp(name, CMD_SERVO_MOVE) == 0) {
-    n = sscanf(cmd, CMD_SERVO_MOVE " %d %c", &a, &extra);
-    sendResult(name, n == 1 && isUnlocked() && moveServo(a));
+    n = sscanf(cmd, CMD_SERVO_MOVE " %d %d %c", &a, &b, &extra);
+    sendResult(name, n == 2 && isUnlocked() && moveServo(a, b));
   } else if (strcmp(name, CMD_UNLOCK) == 0) {
     char key[UNLOCK_KEY_LEN];
 
@@ -121,8 +121,13 @@ void onReceive(const char *cmd) {
   } else if (strcmp(name, CMD_SERVO_GET) == 0) {
     char buf[CMD_LEN];
 
-    snprintf(buf, sizeof(buf), "d:%d servoget %d %d %d\n",
-             getDeviceID(), getServoRest(), getServoUp(), getServoTime());
+    n = sscanf(cmd, CMD_SERVO_GET " %d %c", &a, &extra);
+    if (n != 1 || getServoRest(a) < 0) {
+      sendResult(name, false);
+      return;
+    }
+    snprintf(buf, sizeof(buf), "d:%d servoget %d %d %d %d\n",
+             getDeviceID(), a, getServoRest(a), getServoUp(a), getServoTime());
     txBLE(buf);
     Serial.print(buf);
   } else {

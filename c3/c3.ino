@@ -22,8 +22,10 @@ void setup(void) {
   esp_read_mac(macBT, ESP_MAC_BT);
   Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
                 macBT[0], macBT[1], macBT[2], macBT[3], macBT[4], macBT[5]);
-  Serial.printf("servo: rest %d, up %d, %d ms\n",
-                getServoRest(), getServoUp(), getServoTime());
+  for (int ch = 1; ch <= SERVO_CH_NUM; ch++) {
+    Serial.printf("servo %d: rest %d, up %d, %d ms\n",
+                  ch, getServoRest(ch), getServoUp(ch), getServoTime());
+  }
 }
 
 void loop(void) {
