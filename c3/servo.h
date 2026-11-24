@@ -2,8 +2,14 @@
 #define C3_SERVO_H__
 
 //GPIO
-#define GPIO_SERVO                6
-#define GPIO_SERVO_PWR_EN         5
+#define GPIO_PWR_EN               4
+#define GPIO_M1_PWM1              5
+#define GPIO_M1_PWM2              6
+#define GPIO_M2_PWM1              7
+#define GPIO_M2_PWM2              10
+
+//Channel 1-4: M1_PWM1, M1_PWM2, M2_PWM1, M2_PWM2
+#define SERVO_CH_NUM              4
 
 //Servo
 #define SERVO_PWM_HZ              50
@@ -23,21 +29,25 @@
 
 //Wait after SERVO_PWR_EN is High, before PWM starts
 #define SERVO_PWR_ON_MS           10
+//Start the 2nd servo of a motor board later than the 1st one,
+//not to overlap the inrush currents on the same USB power
+#define SERVO_STAGGER_MS          50
 //Wait after the last pulse, before PWM stops (longer than a period)
 #define SERVO_STOP_MS             25
 //Power off forcibly if the whole sequence exceeds this
-#define SERVO_LIMIT_MS            1500
+//(longest: PWR_ON 10 + STAGGER 50 + MS_MAX 700 * 2 + STOP 25 = 1485ms)
+#define SERVO_LIMIT_MS            1600
 
-//Servo
+//Servo, ch: 1 to SERVO_CH_NUM
 void initServo(void);
 void loopServo(void);
 bool startServo(void);
 bool isServoBusy(void);
-bool moveServo(int deg);
-bool setServoAngle(int rest, int up);
+bool moveServo(int ch, int deg);
+bool setServoAngle(int ch, int rest, int up);
 bool setServoTime(int ms);
-int getServoRest(void);
-int getServoUp(void);
+int getServoRest(int ch);
+int getServoUp(int ch);
 int getServoTime(void);
 
 #endif /* C3_SERVO_H__ */

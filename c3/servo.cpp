@@ -6,20 +6,39 @@
 
 #define SV_IDLE                   0
 #define SV_POWER_ON               1
-#define SV_RAISE                  2
-#define SV_RETURN                 3
-#define SV_MOVE                   4
-#define SV_STOP                   5
+#define SV_RUN                    2
+#define SV_STOP                   3
+
+//State of each channel in SV_RUN
+#define CH_SKIP                   0
+#define CH_WAIT                   1
+#define CH_RAISE                  2
+#define CH_RETURN                 3
+#define CH_MOVE                   4
+#define CH_DONE                   5
+
+static const int chPin[SERVO_CH_NUM] = {
+  GPIO_M1_PWM1, GPIO_M1_PWM2, GPIO_M2_PWM1, GPIO_M2_PWM2,
+};
+//The 2nd servo of each motor board starts later
+static const unsigned long chStagger[SERVO_CH_NUM] = {
+  0, SERVO_STAGGER_MS, 0, SERVO_STAGGER_MS,
+};
 
 static int svState = SV_IDLE;
 static unsigned long svStateTime = 0;
 static unsigned long svStartTime = 0;
 
+static int chState[SERVO_CH_NUM];
+static unsigned long chStateTime[SERVO_CH_NUM];
+static unsigned long chDelay[SERVO_CH_NUM];
+static bool chAttached[SERVO_CH_NUM];
+
 //servomove: move to moveDeg and power off (-1: raise)
 static int moveDeg = -1;
 
-static int restDeg = SERVO_REST_DEFAULT;
-static int upDeg = SERVO_UP_DEFAULT;
+static int restDeg[SERVO_CH_NUM];
+static int upDeg[SERVO_CH_NUM];
 static int waitMs = SERVO_MS_DEFAULT;
 
 static Preferences prefs;
@@ -31,6 +50,19 @@ static void setSvState(int s) {
 
 static unsigned long getSvStateTime(void) {
   return millis() - svStateTime;
+}
+
+static void setChState(int i, int s) {
+  chState[i] = s;
+  chStateTime[i] = millis();
+}
+
+static unsigned long getChStateTime(int i) {
+  return millis() - chStateTime[i];
+}
+
+static bool isValidCh(int ch) {
+  return 1 <= ch && ch <= SERVO_CH_NUM;
 }
 
 static bool isValidAngle(int deg) {
@@ -47,44 +79,50 @@ static uint32_t degToDuty(int deg) {
   return us * ((1UL << SERVO_PWM_BITS) - 1) / SERVO_PERIOD_US;
 }
 
-static void startPWM(void) {
+static void startPWM(int i) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcAttach(GPIO_SERVO, SERVO_PWM_HZ, SERVO_PWM_BITS);
+  ledcAttach(chPin[i], SERVO_PWM_HZ, SERVO_PWM_BITS);
 #else
-  ledcSetup(0, SERVO_PWM_HZ, SERVO_PWM_BITS);
-  ledcAttachPin(GPIO_SERVO, 0);
+  ledcSetup(i, SERVO_PWM_HZ, SERVO_PWM_BITS);
+  ledcAttachPin(chPin[i], i);
 #endif
+  chAttached[i] = true;
 }
 
-static void writePWM(int deg) {
+static void writePWM(int i, int deg) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(GPIO_SERVO, degToDuty(deg));
+  ledcWrite(chPin[i], degToDuty(deg));
 #else
-  ledcWrite(0, degToDuty(deg));
+  ledcWrite(i, degToDuty(deg));
 #endif
 }
 
 //Stop pulses at the next period, without cutting the current pulse.
 //LEDC applies the new duty from the next period
-static void stopPulse(void) {
+static void stopPulse(int i) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(GPIO_SERVO, 0);
+  ledcWrite(chPin[i], 0);
 #else
-  ledcWrite(0, 0);
+  ledcWrite(i, 0);
 #endif
 }
 
-//Stop PWM, fix the signal LOW, and cut the servo power
+//Stop PWM, fix the signals LOW, and cut the servo power
 //Call stopPulse() and wait SERVO_STOP_MS before this, or the last pulse may be cut
 static void powerOff(void) {
+  for (int i = 0; i < SERVO_CH_NUM; i++) {
+    if (chAttached[i]) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcDetach(GPIO_SERVO);
+      ledcDetach(chPin[i]);
 #else
-  ledcDetachPin(GPIO_SERVO);
+      ledcDetachPin(chPin[i]);
 #endif
-  pinMode(GPIO_SERVO, OUTPUT);
-  digitalWrite(GPIO_SERVO, LOW);
-  digitalWrite(GPIO_SERVO_PWR_EN, LOW);
+      chAttached[i] = false;
+    }
+    pinMode(chPin[i], OUTPUT);
+    digitalWrite(chPin[i], LOW);
+  }
+  digitalWrite(GPIO_PWR_EN, LOW);
 }
 
 //Place to check the power supply before moving (always OK for now)
@@ -92,52 +130,78 @@ static bool checkPower(void) {
   return true;
 }
 
-void initServo(void) {
-  pinMode(GPIO_SERVO_PWR_EN, OUTPUT);
-  digitalWrite(GPIO_SERVO_PWR_EN, LOW);
-  pinMode(GPIO_SERVO, OUTPUT);
-  digitalWrite(GPIO_SERVO, LOW);
+static void loadPrefs(void) {
+  char key[8];
 
   prefs.begin("servo", true);
-  restDeg = prefs.getInt("rest", SERVO_REST_DEFAULT);
-  upDeg = prefs.getInt("up", SERVO_UP_DEFAULT);
+  for (int i = 0; i < SERVO_CH_NUM; i++) {
+    snprintf(key, sizeof(key), "rest%d", i + 1);
+    restDeg[i] = prefs.getInt(key, SERVO_REST_DEFAULT);
+    snprintf(key, sizeof(key), "up%d", i + 1);
+    upDeg[i] = prefs.getInt(key, SERVO_UP_DEFAULT);
+
+    if (!isValidAngle(restDeg[i]) || !isValidAngle(upDeg[i])) {
+      restDeg[i] = SERVO_REST_DEFAULT;
+      upDeg[i] = SERVO_UP_DEFAULT;
+    }
+  }
   waitMs = prefs.getInt("ms", SERVO_MS_DEFAULT);
   prefs.end();
 
-  if (!isValidAngle(restDeg) || !isValidAngle(upDeg)) {
-    restDeg = SERVO_REST_DEFAULT;
-    upDeg = SERVO_UP_DEFAULT;
-  }
   if (!isValidTime(waitMs)) {
     waitMs = SERVO_MS_DEFAULT;
   }
+}
+
+void initServo(void) {
+  pinMode(GPIO_PWR_EN, OUTPUT);
+  digitalWrite(GPIO_PWR_EN, LOW);
+  for (int i = 0; i < SERVO_CH_NUM; i++) {
+    pinMode(chPin[i], OUTPUT);
+    digitalWrite(chPin[i], LOW);
+    chAttached[i] = false;
+    chState[i] = CH_SKIP;
+  }
+
+  loadPrefs();
 
   setSvState(SV_IDLE);
 }
 
+static void powerOn(void) {
+  digitalWrite(GPIO_PWR_EN, HIGH);
+  svStartTime = millis();
+  setSvState(SV_POWER_ON);
+}
+
+//Raise all channels
 bool startServo(void) {
   if (svState != SV_IDLE) {
     return false;
   }
 
   moveDeg = -1;
-  digitalWrite(GPIO_SERVO_PWR_EN, HIGH);
-  svStartTime = millis();
-  setSvState(SV_POWER_ON);
+  for (int i = 0; i < SERVO_CH_NUM; i++) {
+    chState[i] = CH_WAIT;
+    chDelay[i] = chStagger[i];
+  }
+  powerOn();
 
   return true;
 }
 
-//Move to the angle, then power off at the angle (for adjustment)
-bool moveServo(int deg) {
-  if (svState != SV_IDLE || !isValidAngle(deg)) {
+//Move a channel to the angle, then power off at the angle (for adjustment)
+bool moveServo(int ch, int deg) {
+  if (svState != SV_IDLE || !isValidCh(ch) || !isValidAngle(deg)) {
     return false;
   }
 
   moveDeg = deg;
-  digitalWrite(GPIO_SERVO_PWR_EN, HIGH);
-  svStartTime = millis();
-  setSvState(SV_POWER_ON);
+  for (int i = 0; i < SERVO_CH_NUM; i++) {
+    chState[i] = (i == ch - 1) ? CH_WAIT : CH_SKIP;
+    chDelay[i] = 0;
+  }
+  powerOn();
 
   return true;
 }
@@ -146,7 +210,42 @@ bool isServoBusy(void) {
   return svState != SV_IDLE;
 }
 
+//Returns true if the channel finished
+static bool loopCh(int i) {
+  switch (chState[i]) {
+  case CH_WAIT:
+    if (getSvStateTime() >= chDelay[i]) {
+      startPWM(i);
+      if (moveDeg >= 0) {
+        writePWM(i, moveDeg);
+        setChState(i, CH_MOVE);
+      } else {
+        writePWM(i, upDeg[i]);
+        setChState(i, CH_RAISE);
+      }
+    }
+    break;
+  case CH_RAISE:
+    if (getChStateTime(i) >= (unsigned long)waitMs) {
+      writePWM(i, restDeg[i]);
+      setChState(i, CH_RETURN);
+    }
+    break;
+  case CH_RETURN:
+  case CH_MOVE:
+    if (getChStateTime(i) >= (unsigned long)waitMs) {
+      stopPulse(i);
+      setChState(i, CH_DONE);
+    }
+    break;
+  }
+
+  return chState[i] == CH_SKIP || chState[i] == CH_DONE;
+}
+
 void loopServo(void) {
+  bool done = true;
+
   if (svState == SV_IDLE) {
     return;
   }
@@ -170,26 +269,16 @@ void loopServo(void) {
         setSvState(SV_IDLE);
         break;
       }
-      startPWM();
-      if (moveDeg >= 0) {
-        writePWM(moveDeg);
-        setSvState(SV_MOVE);
-      } else {
-        writePWM(upDeg);
-        setSvState(SV_RAISE);
+      setSvState(SV_RUN);
+    }
+    break;
+  case SV_RUN:
+    for (int i = 0; i < SERVO_CH_NUM; i++) {
+      if (!loopCh(i)) {
+        done = false;
       }
     }
-    break;
-  case SV_RAISE:
-    if (getSvStateTime() >= (unsigned long)waitMs) {
-      writePWM(restDeg);
-      setSvState(SV_RETURN);
-    }
-    break;
-  case SV_RETURN:
-  case SV_MOVE:
-    if (getSvStateTime() >= (unsigned long)waitMs) {
-      stopPulse();
+    if (done) {
       setSvState(SV_STOP);
     }
     break;
@@ -202,17 +291,21 @@ void loopServo(void) {
   }
 }
 
-bool setServoAngle(int rest, int up) {
-  if (!isValidAngle(rest) || !isValidAngle(up)) {
+bool setServoAngle(int ch, int rest, int up) {
+  char key[8];
+
+  if (!isValidCh(ch) || !isValidAngle(rest) || !isValidAngle(up)) {
     return false;
   }
 
-  restDeg = rest;
-  upDeg = up;
+  restDeg[ch - 1] = rest;
+  upDeg[ch - 1] = up;
 
   prefs.begin("servo", false);
-  prefs.putInt("rest", restDeg);
-  prefs.putInt("up", upDeg);
+  snprintf(key, sizeof(key), "rest%d", ch);
+  prefs.putInt(key, rest);
+  snprintf(key, sizeof(key), "up%d", ch);
+  prefs.putInt(key, up);
   prefs.end();
 
   return true;
@@ -232,12 +325,14 @@ bool setServoTime(int ms) {
   return true;
 }
 
-int getServoRest(void) {
-  return restDeg;
+//Returns -1 if ch is invalid
+int getServoRest(int ch) {
+  return isValidCh(ch) ? restDeg[ch - 1] : -1;
 }
 
-int getServoUp(void) {
-  return upDeg;
+//Returns -1 if ch is invalid
+int getServoUp(int ch) {
+  return isValidCh(ch) ? upDeg[ch - 1] : -1;
 }
 
 int getServoTime(void) {
